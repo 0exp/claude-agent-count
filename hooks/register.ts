@@ -19,6 +19,13 @@ const COLOR: Record<State, string> = {
   idle: '\x1b[38;2;170;170;170m',
 }
 
+const KIND_COLOR = {
+  agents: '\x1b[38;2;152;251;152m',
+  sub: '\x1b[38;2;135;206;250m',
+  sh: '\x1b[38;2;175;238;238m',
+  mon: '\x1b[38;2;255;160;160m',
+}
+
 const MAIN_COLOR = { idle: '\x1b[38;2;170;170;170m', thinking: '\x1b[38;2;255;0;255m', tool: '\x1b[38;2;239;100;124m' }
 const ELAPSED_COLOR = '\x1b[38;2;144;238;144m'
 const WHITE = '\x1b[38;2;255;255;255m'
@@ -38,6 +45,12 @@ const elapsed = (ms: number) => {
 
 const pair = (key: string, value: number, color = '') =>
   `${BOLD}${key}${UNBOLD}:${color}${value}${color === '' ? '' : GRAY}`
+
+// the key in the kind's color (agents: gray), the value colored only when non-zero
+const kindPair = (key: keyof typeof KIND_COLOR, value: number) => {
+  const label = key === 'agents' ? `${BOLD}${key}${UNBOLD}` : `${KIND_COLOR[key]}${BOLD}${key}${UNBOLD}${GRAY}`
+  return `${label}:${value > 0 ? `${KIND_COLOR[key]}${value}${GRAY}` : value}`
+}
 
 // shells and monitors have no listing API: tracked from their tool calls,
 // dropped on their task-notification, TaskStop, or the Stop hook's snapshot
@@ -75,8 +88,8 @@ async function refresh($: EngineInterface) {
 
   const total = byKind.agent + byKind.shell + byKind.monitor
   const line =
-    `${GRAY}⚙ ${BOLD}main${UNBOLD}:${mainLabel}${mainTime}${GRAY} │ ${pair('agents', total)} ` +
-    `(${pair('sub', byKind.agent)} ${pair('sh', byKind.shell)} ${pair('mon', byKind.monitor)}) │ ` +
+    `${GRAY}⚙ ${BOLD}main${UNBOLD}:${mainLabel}${mainTime}${GRAY} │ ${kindPair('agents', total)} ` +
+    `(${kindPair('sub', byKind.agent)} ${kindPair('sh', byKind.shell)} ${kindPair('mon', byKind.monitor)}) │ ` +
     STATES.map(state => pair(state, byState[state], byState[state] > 0 ? COLOR[state] : '')).join(' ') +
     RESET
 

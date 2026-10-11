@@ -13,7 +13,8 @@ for the status line:
   the last prompt's time stays, e.g. `(ltt:2m10s)` (last task time; the time
   in white).
 - `agents`: everything in flight; `sub` subagents and teammates, `sh` background
-  shell commands, `mon` monitors.
+  shell commands, `mon` monitors; non-zero values in their own color (light
+  green, sky blue, pale turquoise, light coral), the `sub`/`sh`/`mon` keys too.
 - `pending` / `running` / `waiting` / `idle`: the same tasks by state (finished,
   failed and killed ones are not counted); non-zero values are colored.
 
