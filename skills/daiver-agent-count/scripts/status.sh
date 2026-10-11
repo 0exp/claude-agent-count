@@ -18,6 +18,9 @@ fi
 echo "== statusLine"
 if jq -e '.statusLine.command | contains(".claude/agent-count/")' "$SETTINGS" >/dev/null 2>&1; then
   echo "wired, refreshInterval: $(jq -r '.statusLine.refreshInterval // "default"' "$SETTINGS")"
+elif jq -e '.statusLine.command | contains(".claude/agent-prompt-view/")' "$SETTINGS" >/dev/null 2>&1 &&
+  grep -q '.claude/agent-count/' "$HOME/.claude/agent-prompt-view/statusline.sh" 2>/dev/null; then
+  echo "wired through agent-prompt-view, refreshInterval: $(jq -r '.statusLine.refreshInterval // "default"' "$SETTINGS")"
 else
   echo "not wired: the counters line is written but never printed"
 fi

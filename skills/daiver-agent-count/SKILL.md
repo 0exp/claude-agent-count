@@ -25,7 +25,7 @@ Shows one status-line row under the model name:
 | Installed as | `agent-count@agent-count`, user scope; for development the marketplace `agent-count` is a `directory` source pointing at the repo, for users a GitHub source (`0exp/claude-agent-count`) read from the plugin cache |
 | This skill | `skills/daiver-agent-count/` in the repo (ships with the plugin) |
 | Counters line, per session | `~/.claude/agent-count/<session_id>` (ANSI-colored, one line) |
-| Status-line wiring | `statusLine.command` in `~/.claude/settings.json`: prints that file right after the model line; `refreshInterval: 1` |
+| Status-line wiring | printed right after the model line by the agent-prompt-view script (`~/.claude/agent-prompt-view/statusline.sh`, run by `statusLine.command`), or inline in `statusLine.command` without that mod; `refreshInterval: 1` |
 | Status-line snippet | `~/Projects/claude-agent-count/statusline/agent-count.sh` |
 
 With a `directory` marketplace the installed plugin is read from the repo folder: never move or delete it without reinstalling.
@@ -61,7 +61,7 @@ Uninstalling does not touch the statusLine: the row just disappears once no file
 
 **Change the line format / colors**: everything is built in `refresh()`; colors are 24-bit ANSI constants (`GRAY`, `COLOR`, `MAIN_COLOR`) matching the user's status line palette. Show the user a plain-text preview (strip ANSI with `sed $'s/\e\\[[0-9;]*m//g'`) before and after.
 
-**Re-wire the status line**: the fragment goes right after `printf '%s\n' "$model";` in `statusLine.command`:
+**Re-wire the status line**: with the agent-prompt-view mod the fragment lives in its script (`statusline/prompt-view.sh`, printed after the first line) and `statusLine.command` only runs `~/.claude/agent-prompt-view/statusline.sh`: change it there. Without that mod the fragment goes right after `printf '%s\n' "$model";` in `statusLine.command`:
 ```sh
 af="$HOME/.claude/agent-count/$(echo "$input" | jq -r '.session_id // empty')"; [ -f "$af" ] && cat "$af";
 ```
