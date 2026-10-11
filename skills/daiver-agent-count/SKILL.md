@@ -11,7 +11,7 @@ Shows one status-line row under the model name:
 ⚙ main:thinking (1m05s) │ agents:6 (sub:4 sh:1 mon:1) │ pending:0 running:4 waiting:1 idle:1
 ```
 
-- `main`: main loop state: `thinking` (turn running), `tool:<name>` (a main-loop tool call in flight), `idle` (turn ended). While working, the time spent on the current prompt follows in green, `(1m05s)`; once idle, the last prompt's time stays as `(ltt:2m10s)` (gray `ltt:`, white time).
+- `main`: main loop state: `thinking` (turn running), `tool:<name>` (a main-loop tool call in flight), `waiting` (turn ended, background work still pending/running/waiting), `idle` (white; turn ended, nothing in flight). While working, the time spent on the current prompt follows in green, `(1m05s)`; once idle, the last prompt's time stays as `(ltt:2m10s)` (gray `ltt:`, white time).
 - `agents`: all background work; `sub` subagents/teammates, `sh` background shells, `mon` monitors.
 - `pending`/`running`/`waiting`/`idle`: the same work by state; ended agents (completed/failed/killed) are not counted.
 
@@ -35,7 +35,7 @@ With a `directory` marketplace the installed plugin is read from the repo folder
 - Main time: `turn.start` stores `$.clock.now()` only when main was `idle` (continuations keep the timer); `turn.complete` of the main loop saves the run time for `ltt` and clears the start; `session.start` (and so every reload) clears both.
 - Agents: `$.agent.list()` polled every 1 s (`$.clock.every` from `session.start`); live statuses `pending|running|waiting|idle`.
 - Shells/monitors have no listing API: added from `tool.call` results (`Bash` `result.backgroundTaskId`, `Monitor` `result.taskId`); removed on a `prompt.submit` with `origin.kind === 'task-notification'` (parses `<task-id>`), on `TaskStop`, and reconciled from `classic.Stop`'s `background_tasks` snapshot.
-- Main state: `turn.start` -> `thinking`; untargeted `tool.call` with no `agentId` pushes/pops the tool name; `turn.complete` with no `agentId` -> `idle`.
+- Main state: `turn.start` -> `thinking`; untargeted `tool.call` with no `agentId` pushes/pops the tool name; `turn.complete` with no `agentId` -> `idle`, shown as `waiting` by `refresh()` while any background work is pending/running/waiting.
 - `refresh($)` is a top-level function (the validator requires `$` to be passed only to top-level functions) and writes the file only when the line changed.
 - Every gating hook has `.catch(($, e, next) => next(e))`: a mod failure must never block a tool call or a prompt.
 - Tracked state lives in module variables: a reload or restart forgets shells/monitors until the next `Stop` snapshot.

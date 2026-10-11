@@ -1,6 +1,6 @@
 {
   "name": "agent-count",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Counts background agents, shells and monitors by state for the status line",
   "author": { "name": "Rustam Ibragimov", "email": "iamdaiver@gmail.com" },
   "license": "MIT"

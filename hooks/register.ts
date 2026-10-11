@@ -26,7 +26,7 @@ const KIND_COLOR = {
   mon: '\x1b[38;2;255;160;160m',
 }
 
-const MAIN_COLOR = { idle: '\x1b[38;2;170;170;170m', thinking: '\x1b[38;2;255;0;255m', tool: '\x1b[38;2;239;100;124m' }
+const MAIN_COLOR = { idle: '\x1b[38;2;255;255;255m', waiting: '\x1b[38;2;135;206;235m', thinking: '\x1b[38;2;255;0;255m', tool: '\x1b[38;2;239;100;124m' }
 const ELAPSED_COLOR = '\x1b[38;2;144;238;144m'
 const WHITE = '\x1b[38;2;255;255;255m'
 
@@ -77,10 +77,13 @@ async function refresh($: EngineInterface) {
   }
 
   const tool = mainTools.at(-1)
+  // an idle main loop still waits while background work is pending, running or waiting
+  const busy = byState.pending + byState.running + byState.waiting
+  const mainState = main === 'idle' && busy > 0 ? 'waiting' : main
   const mainLabel =
     tool !== undefined
       ? `${MAIN_COLOR.tool}tool:${tool}`
-      : `${MAIN_COLOR[main]}${main}`
+      : `${MAIN_COLOR[mainState]}${mainState}`
   const mainTime =
     main !== 'idle'
       ? mainSince === undefined ? '' : ` ${ELAPSED_COLOR}(${elapsed((await $.clock.now()) - mainSince)})`

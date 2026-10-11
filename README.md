@@ -8,8 +8,10 @@ for the status line:
 ```
 
 - `main`: the main loop: `thinking` while its turn runs, `tool:<name>` while
-  one of its tool calls runs, `idle` once the turn ended; while it works, the
-  time spent on the current prompt follows in green, e.g. `(1m05s)`; once idle,
+  one of its tool calls runs, `waiting` once the turn ended while background
+  work is still pending, running or waiting, `idle` (white) once the turn ended
+  and nothing is in flight; while it works, the time spent on the current prompt
+  follows in green, e.g. `(1m05s)`; once the turn ended,
   the last prompt's time stays, e.g. `(ltt:2m10s)` (last task time; the time
   in white).
 - `agents`: everything in flight; `sub` subagents and teammates, `sh` background
