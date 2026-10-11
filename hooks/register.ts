@@ -47,9 +47,9 @@ const pair = (key: string, value: number, color = '') =>
   `${BOLD}${key}${UNBOLD}:${color}${value}${color === '' ? '' : GRAY}`
 
 // the key in the kind's color (agents: gray), the value colored only when non-zero
-const kindPair = (key: keyof typeof KIND_COLOR, value: number) => {
+const kindPair = (key: keyof typeof KIND_COLOR, value: number | 'main') => {
   const label = key === 'agents' ? `${BOLD}${key}${UNBOLD}` : `${KIND_COLOR[key]}${BOLD}${key}${UNBOLD}${GRAY}`
-  return `${label}:${value > 0 ? `${KIND_COLOR[key]}${value}${GRAY}` : value}`
+  return `${label}:${value !== 0 ? `${KIND_COLOR[key]}${value}${GRAY}` : value}`
 }
 
 // shells and monitors have no listing API: tracked from their tool calls,
@@ -90,8 +90,10 @@ async function refresh($: EngineInterface) {
       : mainLast === undefined ? '' : ` ${GRAY}(ltt:${WHITE}${elapsed(mainLast)}${GRAY})`
 
   const total = byKind.agent + byKind.shell + byKind.monitor
+  // only the main loop at work (thinking or in a tool call): `agents:main` instead of a zero
+  const agentsValue = total === 0 && (tool !== undefined || main !== 'idle') ? 'main' : total
   const line =
-    `${GRAY}⚙ ${BOLD}main${UNBOLD}:${mainLabel}${mainTime}${GRAY} │ ${kindPair('agents', total)} ` +
+    `${GRAY}⚙ ${BOLD}main${UNBOLD}:${mainLabel}${mainTime}${GRAY} │ ${kindPair('agents', agentsValue)} ` +
     `(${kindPair('sub', byKind.agent)} ${kindPair('sh', byKind.shell)} ${kindPair('mon', byKind.monitor)}) │ ` +
     STATES.map(state => pair(state, byState[state], byState[state] > 0 ? COLOR[state] : '')).join(' ') +
     RESET

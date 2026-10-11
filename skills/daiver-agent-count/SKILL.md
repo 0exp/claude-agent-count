@@ -12,7 +12,7 @@ Shows one status-line row under the model name:
 ```
 
 - `main`: main loop state: `thinking` (turn running), `tool:<name>` (a main-loop tool call in flight), `waiting` (turn ended, background work still pending/running/waiting), `idle` (white; turn ended, nothing in flight). While working, the time spent on the current prompt follows in green, `(1m05s)`; once idle, the last prompt's time stays as `(ltt:2m10s)` (gray `ltt:`, white time).
-- `agents`: all background work; `sub` subagents/teammates, `sh` background shells, `mon` monitors.
+- `agents`: all background work (main not included); `sub` subagents/teammates, `sh` background shells, `mon` monitors. With no background work and main `thinking`/`tool:*`, the value is `main` (in the `agents` value color) instead of `0`.
 - `pending`/`running`/`waiting`/`idle`: the same work by state; ended agents (completed/failed/killed) are not counted.
 
 ## Where things are
@@ -73,7 +73,7 @@ Edit `settings.json` with a JSON-aware tool (python `json`/`jq`), never with sed
 
 ## Debugging
 
-- Counters all zero while work runs: run the status script; if the file's mtime is old, the plugin is not loaded (`claude plugin list`), or the session predates the install. Zeros while only the main loop thinks are correct for `agents`; `main` shows `thinking`.
+- Counters all zero while work runs: run the status script; if the file's mtime is old, the plugin is not loaded (`claude plugin list`), or the session predates the install. While only the main loop works, `agents:main` and zeros elsewhere are correct; `main` shows `thinking`/`tool:*`.
 - Line missing from the status line: statusLine not wired, `jq` missing, or no file for this session id yet.
 - Hook errors: the transcript shows `agent-count: <event> ...` lines only in hot-reloading sessions; otherwise run `claude --debug` and grep the debug log for `agent-count:`.
 - A shell/monitor stuck in the count: its completion notification has not been delivered yet; it is dropped at the end of the next turn via the `Stop` snapshot.

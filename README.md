@@ -14,9 +14,12 @@ for the status line:
   follows in green, e.g. `(1m05s)`; once the turn ended,
   the last prompt's time stays, e.g. `(ltt:2m10s)` (last task time; the time
   in white).
-- `agents`: everything in flight; `sub` subagents and teammates, `sh` background
-  shell commands, `mon` monitors; non-zero values in their own color (light
-  green, sky blue, pale turquoise, light coral), the `sub`/`sh`/`mon` keys too.
+- `agents`: everything in flight besides the main loop; `sub` subagents and
+  teammates, `sh` background shell commands, `mon` monitors; non-zero values in
+  their own color (light green, sky blue, pale turquoise, light coral), the
+  `sub`/`sh`/`mon` keys too. While only the main loop works (`thinking` or
+  `tool:<name>`) and nothing else is in flight, `agents:main` (light green)
+  replaces the zero.
 - `pending` / `running` / `waiting` / `idle`: the same tasks by state (finished,
   failed and killed ones are not counted); non-zero values are colored.
 
