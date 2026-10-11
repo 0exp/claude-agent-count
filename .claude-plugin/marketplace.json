@@ -1,0 +1,6 @@
+{
+  "name": "agent-count",
+  "owner": { "name": "Rustam Ibragimov", "email": "iamdaiver@gmail.com" },
+  "description": "Status-line counters of the main loop state and background agents, shells and monitors",
+  "plugins": [{ "name": "agent-count", "source": "./" }]
+}
