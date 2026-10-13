@@ -1,10 +1,12 @@
 # agent-count
 
 A Claude Code mod that counts the session's background work and keeps one line
-for the status line:
+for the status line, plus one line per live subagent under it:
 
 ```
-⚙ main:thinking (1m05s) │ agents:6 (sub:4 sh:1 mon:1) │ pending:0 running:4 waiting:1 idle:1
+⚙ main:thinking (1m05s) │ agents:4 (sub:2 sh:1 mon:1) │ pending:0 running:3 waiting:1 idle:0
+-> Explore (time:1m01s) [Find lock index usages]
+-> general-purpose (time:12s) [Review swarm changes]
 ```
 
 - `main`: the main loop: `thinking` while its turn runs, `tool:<name>` while
@@ -22,6 +24,12 @@ for the status line:
   replaces the zero.
 - `pending` / `running` / `waiting` / `idle`: the same tasks by state (finished,
   failed and killed ones are not counted); non-zero values are colored.
+- `-> <type> (time:<run time>) [<task>]`: one line per live subagent or
+  teammate (the ones `sub` counts), oldest first: its agent type (a teammate's
+  name), how long it has been listed, and the Agent call's `description` (cut
+  to 60 characters). `AgentInfo` has no start time, so the time runs from the
+  first poll that listed the agent (within 1 s of its start) and starts over
+  when the mod reloads.
 
 Agents come from `$.agent.list()` (polled every 1 s). Shells and monitors are
 tracked from their `Bash` / `Monitor` calls and dropped on their task
@@ -38,7 +46,7 @@ every session).
 
 ## Show it in the status line
 
-The mod writes the line to `~/.claude/agent-count/<session_id>`. Print it from
+The mod writes the lines to `~/.claude/agent-count/<session_id>`. Print it from
 your `statusLine` command where you want the row, e.g. in `~/.claude/settings.json`:
 
 ```json

@@ -29,6 +29,8 @@ const KIND_COLOR = {
 const MAIN_COLOR = { idle: '\x1b[38;2;255;255;255m', waiting: '\x1b[38;2;135;206;235m', thinking: '\x1b[38;2;255;0;255m', tool: '\x1b[38;2;239;100;124m' }
 const ELAPSED_COLOR = '\x1b[38;2;144;238;144m'
 const WHITE = '\x1b[38;2;255;255;255m'
+// a subagent's task on its `->` line is cut to this many characters
+const TASK_MAX = 60
 
 const toState = (status: string): State =>
   status === 'pending' ? 'pending' : status === 'waiting' ? 'waiting' : status === 'idle' ? 'idle' : 'running'
@@ -42,6 +44,8 @@ const elapsed = (ms: number) => {
   if (s < 3600) return `${Math.floor(s / 60)}m${pad(s % 60)}s`
   return `${Math.floor(s / 3600)}h${pad(Math.floor(s / 60) % 60)}m`
 }
+
+const clip = (text: string) => (text.length > TASK_MAX ? `${text.slice(0, TASK_MAX - 1)}…` : text)
 
 const pair = (key: string, value: number, color = '') =>
   `${BOLD}${key}${UNBOLD}:${color}${value}${color === '' ? '' : GRAY}`
@@ -63,10 +67,13 @@ const mainTools: string[] = []
 let mainSince: number | undefined
 // the run time of the last finished prompt, shown while idle
 let mainLast: number | undefined
+// when each live agent was first listed: `AgentInfo` has no start time
+const agentSince = new Map<string, number>()
 let shown = ''
 
 async function refresh($: EngineInterface) {
   const agents = (await $.agent.list()).filter(agent => LIVE.has(agent.status))
+  const now = await $.clock.now()
   const byKind: Record<Kind, number> = { agent: agents.length, shell: 0, monitor: 0 }
   const byState: Record<State, number> = { pending: 0, running: 0, waiting: 0, idle: 0 }
 
@@ -86,7 +93,7 @@ async function refresh($: EngineInterface) {
       : `${MAIN_COLOR[mainState]}${mainState}`
   const mainTime =
     main !== 'idle'
-      ? mainSince === undefined ? '' : ` ${ELAPSED_COLOR}(${elapsed((await $.clock.now()) - mainSince)})`
+      ? mainSince === undefined ? '' : ` ${ELAPSED_COLOR}(${elapsed(now - mainSince)})`
       : mainLast === undefined ? '' : ` ${GRAY}(ltt:${WHITE}${elapsed(mainLast)}${GRAY})`
 
   const total = byKind.agent + byKind.shell + byKind.monitor
@@ -98,9 +105,28 @@ async function refresh($: EngineInterface) {
     STATES.map(state => pair(state, byState[state], byState[state] > 0 ? COLOR[state] : '')).join(' ') +
     RESET
 
-  if (line === shown || file === undefined) return
-  shown = line
-  await $.fs.write(file, `${line}\n`)
+  const live = new Set(agents.map(agent => agent.id))
+  for (const id of agentSince.keys()) if (!live.has(id)) agentSince.delete(id)
+  for (const agent of agents) if (!agentSince.has(agent.id)) agentSince.set(agent.id, now)
+
+  // one `-> <type> (time:<run time>) [<task>]` line per live agent, oldest first;
+  // a teammate goes by its name
+  const subs = agents
+    .map(agent => ({ agent, since: agentSince.get(agent.id) ?? now }))
+    .sort((a, b) => a.since - b.since)
+    .map(({ agent, since }) => {
+      const who = agent.type === 'teammate' && agent.name !== undefined ? agent.name : agent.type
+      return (
+        `${GRAY}-> ${KIND_COLOR.sub}${who}${GRAY} (time:${ELAPSED_COLOR}${elapsed(now - since)}${GRAY}) ` +
+        `[${WHITE}${clip(agent.description)}${GRAY}]${RESET}`
+      )
+    })
+
+  const text = [line, ...subs].map(row => `${row}\n`).join('')
+
+  if (text === shown || file === undefined) return
+  shown = text
+  await $.fs.write(file, text)
 }
 
 export const register: Register = on => {
@@ -112,6 +138,7 @@ export const register: Register = on => {
     mainTools.length = 0
     mainSince = undefined
     mainLast = undefined
+    agentSince.clear()
     await refresh($)
     $.clock.every(1000, () => refresh($))
 

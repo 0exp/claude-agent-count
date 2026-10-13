@@ -5,15 +5,18 @@ description: Manage the agent-count Claude Code mod (status-line counters of the
 
 # agent-count mod
 
-Shows one status-line row under the model name:
+Shows one status-line row under the model name, plus one row per live subagent:
 
 ```
-⚙ main:thinking (1m05s) │ agents:6 (sub:4 sh:1 mon:1) │ pending:0 running:4 waiting:1 idle:1
+⚙ main:thinking (1m05s) │ agents:4 (sub:2 sh:1 mon:1) │ pending:0 running:3 waiting:1 idle:0
+-> Explore (time:1m01s) [Find lock index usages]
+-> general-purpose (time:12s) [Review swarm changes]
 ```
 
 - `main`: main loop state: `thinking` (turn running), `tool:<name>` (a main-loop tool call in flight), `waiting` (turn ended, background work still pending/running/waiting), `idle` (white; turn ended, nothing in flight). While working, the time spent on the current prompt follows in green, `(1m05s)`; once idle, the last prompt's time stays as `(ltt:2m10s)` (gray `ltt:`, white time).
 - `agents`: all background work (main not included); `sub` subagents/teammates, `sh` background shells, `mon` monitors. With no background work and main `thinking`/`tool:*`, the value is `main` (in the `agents` value color) instead of `0`.
 - `pending`/`running`/`waiting`/`idle`: the same work by state; ended agents (completed/failed/killed) are not counted.
+- `-> <type> (time:<run time>) [<task>]`: one row per live agent (the ones `sub` counts), oldest first: gray arrow, agent type in the `sub` color (a teammate's `name` instead of `teammate`), green run time, white `description` cut to `TASK_MAX` (60) characters.
 
 ## Where things are
 
@@ -24,7 +27,7 @@ Shows one status-line row under the model name:
 | Manifest / marketplace | `~/Projects/claude-agent-count/.claude-plugin/{plugin,marketplace}.json` |
 | Installed as | `agent-count@agent-count`, user scope; for development the marketplace `agent-count` is a `directory` source pointing at the repo, for users a GitHub source (`0exp/claude-agent-count`) read from the plugin cache |
 | This skill | `skills/daiver-agent-count/` in the repo (ships with the plugin) |
-| Counters line, per session | `~/.claude/agent-count/<session_id>` (ANSI-colored, one line) |
+| Counters lines, per session | `~/.claude/agent-count/<session_id>` (ANSI-colored: the counters line, then one `->` line per live agent) |
 | Status-line wiring | printed right after the model line by the agent-prompt-view script (`~/.claude/agent-prompt-view/statusline.sh`, run by `statusLine.command`), or inline in `statusLine.command` without that mod; `refreshInterval: 1` |
 | Status-line snippet | `~/Projects/claude-agent-count/statusline/agent-count.sh` |
 
@@ -32,11 +35,12 @@ With a `directory` marketplace the installed plugin is read from the repo folder
 
 ## How it works (keep these invariants when changing it)
 
+- Subagent time: `AgentInfo` has no start time; `refresh()` stamps `agentSince[id] = now` the first time an id is listed live and drops ids no longer live; `session.start` (every reload) clears it, so running agents' times restart after a reload.
 - Main time: `turn.start` stores `$.clock.now()` only when main was `idle` (continuations keep the timer); `turn.complete` of the main loop saves the run time for `ltt` and clears the start; `session.start` (and so every reload) clears both.
 - Agents: `$.agent.list()` polled every 1 s (`$.clock.every` from `session.start`); live statuses `pending|running|waiting|idle`.
 - Shells/monitors have no listing API: added from `tool.call` results (`Bash` `result.backgroundTaskId`, `Monitor` `result.taskId`); removed on a `prompt.submit` with `origin.kind === 'task-notification'` (parses `<task-id>`), on `TaskStop`, and reconciled from `classic.Stop`'s `background_tasks` snapshot.
 - Main state: `turn.start` -> `thinking`; untargeted `tool.call` with no `agentId` pushes/pops the tool name; `turn.complete` with no `agentId` -> `idle`, shown as `waiting` by `refresh()` while any background work is pending/running/waiting.
-- `refresh($)` is a top-level function (the validator requires `$` to be passed only to top-level functions) and writes the file only when the line changed.
+- `refresh($)` is a top-level function (the validator requires `$` to be passed only to top-level functions) and writes the file only when its text (counters line + agent lines) changed.
 - Every gating hook has `.catch(($, e, next) => next(e))`: a mod failure must never block a tool call or a prompt.
 - Tracked state lives in module variables: a reload or restart forgets shells/monitors until the next `Stop` snapshot.
 
