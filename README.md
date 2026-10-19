@@ -4,7 +4,7 @@ A Claude Code mod that counts the session's background work and keeps one line
 for the status line, plus one line per live subagent under it:
 
 ```
-⚙ main:thinking (1m05s) │ agents:4 (sub:2 sh:1 mon:1) │ pending:0 running:3 waiting:1 idle:0
+⚙ main:thinking (1m05s) │ agents:4 (sub:2 sh:1 mon:1) -> pending:0 running:3 waiting:1 idle:0
 -> Explore (time:1m01s) [Find lock index usages]
 -> general-purpose (time:12s) [Review swarm changes]
 ```

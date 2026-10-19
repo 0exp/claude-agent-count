@@ -101,7 +101,7 @@ async function refresh($: EngineInterface) {
   const agentsValue = total === 0 && (tool !== undefined || main !== 'idle') ? 'main' : total
   const line =
     `${GRAY}⚙ ${BOLD}main${UNBOLD}:${mainLabel}${mainTime}${GRAY} │ ${kindPair('agents', agentsValue)} ` +
-    `(${kindPair('sub', byKind.agent)} ${kindPair('sh', byKind.shell)} ${kindPair('mon', byKind.monitor)}) │ ` +
+    `(${kindPair('sub', byKind.agent)} ${kindPair('sh', byKind.shell)} ${kindPair('mon', byKind.monitor)}) -> ` +
     STATES.map(state => pair(state, byState[state], byState[state] > 0 ? COLOR[state] : '')).join(' ') +
     RESET
 

@@ -8,7 +8,7 @@ description: Manage the agent-count Claude Code mod (status-line counters of the
 Shows one status-line row under the model name, plus one row per live subagent:
 
 ```
-⚙ main:thinking (1m05s) │ agents:4 (sub:2 sh:1 mon:1) │ pending:0 running:3 waiting:1 idle:0
+⚙ main:thinking (1m05s) │ agents:4 (sub:2 sh:1 mon:1) -> pending:0 running:3 waiting:1 idle:0
 -> Explore (time:1m01s) [Find lock index usages]
 -> general-purpose (time:12s) [Review swarm changes]
 ```
