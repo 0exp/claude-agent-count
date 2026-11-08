@@ -35,6 +35,14 @@ Agents come from `$.agent.list()` (polled every 1 s). Shells and monitors are
 tracked from their `Bash` / `Monitor` calls and dropped on their task
 notification, `TaskStop`, or the `Stop` hook's `background_tasks` snapshot.
 
+## Themes
+
+`Color theme` (`theme`, `default` by default) in `/config` picks the line's
+colors; `/agent-count-theme <name>` sets it, and shows the current one with no
+argument; the prompt box's typeahead lists the themes for it. Themes: `default` (the colors above). A theme is an entry in `THEMES`
+in `hooks/register.ts` and a name in the option's `options` in
+`.claude-plugin/plugin.json`.
+
 ## Install
 
 ```

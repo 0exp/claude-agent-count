@@ -1,4 +1,4 @@
-import type { AgentStatus, EngineInterface, Register } from 'claude-code'
+import type { AgentStatus, ConfigValue, EngineInterface, PromptAutocompleteInput, Register } from 'claude-code'
 
 type State = 'pending' | 'running' | 'waiting' | 'idle'
 type Kind = 'agent' | 'shell' | 'monitor'
@@ -8,27 +8,44 @@ type Main = 'idle' | 'thinking'
 const STATES: readonly State[] = ['pending', 'running', 'waiting', 'idle']
 const LIVE: ReadonlySet<AgentStatus> = new Set(['pending', 'running', 'waiting', 'idle'])
 
-const GRAY = '\x1b[38;2;128;128;128m'
 const BOLD = '\x1b[1m'
 const UNBOLD = '\x1b[22m'
 const RESET = '\x1b[0m'
-const COLOR: Record<State, string> = {
-  pending: '\x1b[38;2;212;201;106m',
-  running: '\x1b[38;2;144;238;144m',
-  waiting: '\x1b[38;2;135;206;235m',
-  idle: '\x1b[38;2;170;170;170m',
+
+type Theme = {
+  gray: string
+  white: string
+  elapsed: string
+  state: Record<State, string>
+  kind: { agents: string; sub: string; sh: string; mon: string }
+  main: { idle: string; waiting: string; thinking: string; tool: string }
 }
 
-const KIND_COLOR = {
-  agents: '\x1b[38;2;152;251;152m',
-  sub: '\x1b[38;2;135;206;250m',
-  sh: '\x1b[38;2;175;238;238m',
-  mon: '\x1b[38;2;255;160;160m',
+// the color themes, by the names the theme option takes (/agent-count-theme);
+// 24-bit ANSI matching the agent-prompt-view status line's palette
+const THEMES: Record<string, Theme> = {
+  default: {
+    gray: '\x1b[38;2;128;128;128m',
+    white: '\x1b[38;2;255;255;255m',
+    elapsed: '\x1b[38;2;144;238;144m',
+    state: {
+      pending: '\x1b[38;2;212;201;106m',
+      running: '\x1b[38;2;144;238;144m',
+      waiting: '\x1b[38;2;135;206;235m',
+      idle: '\x1b[38;2;170;170;170m',
+    },
+    kind: {
+      agents: '\x1b[38;2;152;251;152m',
+      sub: '\x1b[38;2;135;206;250m',
+      sh: '\x1b[38;2;175;238;238m',
+      mon: '\x1b[38;2;255;160;160m',
+    },
+    main: { idle: '\x1b[38;2;255;255;255m', waiting: '\x1b[38;2;135;206;235m', thinking: '\x1b[38;2;255;0;255m', tool: '\x1b[38;2;239;100;124m' },
+  },
 }
+const THEME_NAMES = Object.keys(THEMES)
+let theme = THEMES.default
 
-const MAIN_COLOR = { idle: '\x1b[38;2;255;255;255m', waiting: '\x1b[38;2;135;206;235m', thinking: '\x1b[38;2;255;0;255m', tool: '\x1b[38;2;239;100;124m' }
-const ELAPSED_COLOR = '\x1b[38;2;144;238;144m'
-const WHITE = '\x1b[38;2;255;255;255m'
 // a subagent's task on its `->` line is cut to this many characters
 const TASK_MAX = 60
 
@@ -48,12 +65,12 @@ const elapsed = (ms: number) => {
 const clip = (text: string) => (text.length > TASK_MAX ? `${text.slice(0, TASK_MAX - 1)}…` : text)
 
 const pair = (key: string, value: number, color = '') =>
-  `${BOLD}${key}${UNBOLD}:${color}${value}${color === '' ? '' : GRAY}`
+  `${BOLD}${key}${UNBOLD}:${color}${value}${color === '' ? '' : theme.gray}`
 
 // the key in the kind's color (agents: gray), the value colored only when non-zero
-const kindPair = (key: keyof typeof KIND_COLOR, value: number | 'main') => {
-  const label = key === 'agents' ? `${BOLD}${key}${UNBOLD}` : `${KIND_COLOR[key]}${BOLD}${key}${UNBOLD}${GRAY}`
-  return `${label}:${value !== 0 ? `${KIND_COLOR[key]}${value}${GRAY}` : value}`
+const kindPair = (key: keyof Theme['kind'], value: number | 'main') => {
+  const label = key === 'agents' ? `${BOLD}${key}${UNBOLD}` : `${theme.kind[key]}${BOLD}${key}${UNBOLD}${theme.gray}`
+  return `${label}:${value !== 0 ? `${theme.kind[key]}${value}${theme.gray}` : value}`
 }
 
 // shells and monitors have no listing API: tracked from their tool calls,
@@ -71,6 +88,13 @@ let mainLast: number | undefined
 const agentSince = new Map<string, number>()
 let shown = ''
 
+// sets this plugin's /config row of the field; the reason when it was refused
+async function setOption($: EngineInterface, field: string, value: ConfigValue) {
+  const row = (await $.config.list()).find(one => one.provider.plugin === $.plugin.name && one.key.endsWith(`.${field}`))
+
+  return row === undefined ? undefined : (await $.config.set({ key: row.key, value })).deny
+}
+
 async function refresh($: EngineInterface) {
   const agents = (await $.agent.list()).filter(agent => LIVE.has(agent.status))
   const now = await $.clock.now()
@@ -83,6 +107,7 @@ async function refresh($: EngineInterface) {
     byState[task.state] += 1
   }
 
+  const { gray: GRAY, white: WHITE, elapsed: ELAPSED_COLOR, state: COLOR, kind: KIND_COLOR, main: MAIN_COLOR } = theme
   const tool = mainTools.at(-1)
   // an idle main loop still waits while background work is pending, running or waiting
   const busy = byState.pending + byState.running + byState.waiting
@@ -129,7 +154,27 @@ async function refresh($: EngineInterface) {
   await $.fs.write(file, text)
 }
 
-export const register: Register = on => {
+// typeahead rows for the theme command: `/agent-count-theme <theme>` rows while the command
+// itself is being typed (the event never fires for an empty token, so not right
+// after the space), then the themes that start with the typed argument
+function themeRows(e: PromptAutocompleteInput, names: readonly string[], current: string) {
+  const before = e.text.slice(0, e.cursor)
+  const command = '/agent-count-theme'
+  const row = (name: string, text: string) => ({ text, description: name === current ? 'current theme' : 'theme' })
+
+  // from the command's own part on (`/agent-count-`), not with every command
+  if (e.start === 0 && e.token.length > command.lastIndexOf('-') && command.startsWith(e.token)) {
+    return names.map(name => row(name, `${command} ${name}`))
+  }
+
+  const arg = /^\/agent-count-theme\s+(\S+)$/.exec(before)?.[1]?.toLowerCase()
+
+  return arg === undefined ? [] : names.filter(name => name.startsWith(arg) && name !== arg).map(name => row(name, name))
+}
+
+export const register: Register = (on, options) => {
+  theme = THEMES[String(options.theme)] ?? THEMES.default
+
   on('session.start', async ($, e, next) => {
     const home = await $.env.get('HOME')
     file = `${home}/.claude/agent-count/${await $.session.id()}`
@@ -141,9 +186,33 @@ export const register: Register = on => {
     agentSince.clear()
     await refresh($)
     $.clock.every(1000, () => refresh($))
+    await $.command.register({
+      name: 'agent-count-theme',
+      description: "The agent-count line's color theme",
+      argumentHint: `[${THEME_NAMES.join('|')}]`,
+    })
 
     return next(e)
   })
+
+  // /agent-count-theme <name>: the theme option; the current one when no argument
+  on('command.run', { command: 'agent-count-theme' }, async ($, e) => {
+    const arg = e.args.trim().toLowerCase()
+    const current = THEME_NAMES.find(name => THEMES[name] === theme) ?? 'default'
+
+    if (arg === '') return { text: `Agent-count theme: ${current} (one of ${THEME_NAMES.join(', ')})` }
+    if (!THEME_NAMES.includes(arg)) return { text: `Usage: /agent-count-theme [${THEME_NAMES.join('|')}]` }
+
+    const deny = await setOption($, 'theme', arg)
+
+    if (deny !== undefined) return { text: `The agent-count theme was not changed: ${deny}` }
+
+    theme = THEMES[arg]
+    shown = ''
+    await refresh($)
+
+    return { text: `The agent-count line now uses the ${arg} theme.` }
+  }).catch(($, e, next) => next(e))
 
   on('turn.start', async ($, e, next) => {
     if (main === 'idle') mainSince = await $.clock.now()
@@ -225,5 +294,14 @@ export const register: Register = on => {
     }
 
     return next(e)
+  }).catch(($, e, next) => next(e))
+
+  // the theme names in the prompt box's typeahead for /agent-count-theme
+  on('prompt.autocomplete', ($, e, next) => {
+    const rows = themeRows(e, THEME_NAMES, THEME_NAMES.find(name => THEMES[name] === theme) ?? 'default')
+
+    if (rows.length === 0) return next(e)
+
+    return next(e).then(result => ({ suggestions: [...result.suggestions, ...rows] }))
   }).catch(($, e, next) => next(e))
 }
